@@ -33,10 +33,10 @@ def load_data(data_path: str, control: bool=True, daily_limit: list=[(8, 0), (20
     accl = load_pkl(os.path.join(file_path, 'accl.pkl'))
     location = load_pkl(os.path.join(file_path, 'location.pkl'))
     ts = load_pkl(os.path.join(file_path, 'timestamp.pkl'))
-    min_start = pd.Timestamp(str(ts[0, 0].date()) + f' 0{daily_limit[0][0]}:0{daily_limit[0][1]}:00')
-    max_end = pd.Timestamp(str(ts[0, 0].date()) + f' 0{daily_limit[1][0]}:0{daily_limit[1][1]}:00')
-    idx = np.argwhere((min_start <= ts[:, 0]) & (ts[:, 0] < max_end)).reshape(-1)
-    return rssi[idx], accl[idx], location[idx], ts[idx]
+    min_start = pd.Timestamp(str(ts[0].date()) + f' 0{daily_limit[0][0]}:0{daily_limit[0][1]}:00')
+    max_end = pd.Timestamp(str(ts[0].date()) + f' 0{daily_limit[1][0]}:0{daily_limit[1][1]}:00')
+    idx = np.argwhere((min_start <= ts[:]) & (ts[:] < max_end)).reshape(-1)
+    return rssi[idx], accl[idx], location[idx]
 
 
 def normalise(train: np.array, test: np.array=None, val: np.array=None):
@@ -60,7 +60,7 @@ def normalise(train: np.array, test: np.array=None, val: np.array=None):
 def train_validate(
     rssi: torch.Tensor, accl: torch.Tensor, locations: torch.Tensor, 
     rssi_val: torch.Tensor=None, accl_val: torch.Tensor=None, loc_val: torch.Tensor=None,
-    params: dict=dict()
+    interested_value: int=None, params: dict=dict()
 ):
     """
     rssi: Rssi [Batch, T, Features]
@@ -95,7 +95,8 @@ def train_validate(
         total_loss = 0.0
         epoch_num_correct = 0
         epoch_num_correct_val = 0
-        for batch_idx in range(int(rssi.shape[0] / params['batch_size'])):
+        num_batches = np.ceil(rssi.shape[0] / params['batch_size'])
+        for batch_idx in range(int(num_batches)):
             X0 = rssi[(batch_idx * params['batch_size']):((batch_idx + 1) * params['batch_size'])]
             # y: [B, T]
             y = locations[(batch_idx * params['batch_size']):((batch_idx + 1) * params['batch_size'])]
@@ -105,7 +106,8 @@ def train_validate(
             loc_hat = model(rssi=X0, accl=X1)
             optimizer.zero_grad()
             loss = model.calculate_loss(
-                rssi=X0, accl=X1, locations=y.argmax(-1).type(torch.long), with_recon=True
+                rssi=X0, accl=X1, locations=y.argmax(-1).type(torch.long),
+                interested_value=interested_value
             ) 
             loss.backward()
             optimizer.step()
@@ -113,7 +115,8 @@ def train_validate(
             epoch_num_correct += (loc_hat[:, -1] == y[:, -1].argmax(-1)).type(torch.float).sum().item()
             if batch_idx % 5 == 0:
                 print('Batch: {}, Train Loss: {:.5f}, Acc: {:.5f}'.format(
-                    batch_idx * params['batch_size'], total_loss / (batch_idx + 1), epoch_num_correct / (batch_idx + 1)
+                    batch_idx * params['batch_size'], total_loss / (batch_idx + 1), 
+                    epoch_num_correct / len(rssi) * 100
                 ))
 
         ###################
@@ -121,7 +124,8 @@ def train_validate(
         ###################
         if rssi_val is not None:
             model.eval()
-            for batch_idx in range(int(rssi_val.shape[0] / params['batch_size'])):
+            num_batches = np.ceil(rssi_val.shape[0] / params['batch_size'])
+            for batch_idx in range(int(num_batches)):
                 X0 = rssi_val[(batch_idx * params['batch_size']):((batch_idx + 1) * params['batch_size'])]
                 y = loc_val[(batch_idx * params['batch_size']):((batch_idx + 1) * params['batch_size'])]
                 X1 = None if accl_val is None else accl_val[
@@ -132,7 +136,7 @@ def train_validate(
             # early_stopping needs the validation accuracy to check if it has increased, 
             # and if it has, it will make a checkpoint of the current model
             early_stopping(epoch_num_correct_val / len(rssi_val), model)
-            print('Val Acc: {:.5f}'.format(epoch_num_correct_val / len(rssi_val)))
+            print('Val Acc: {:.5f}'.format(epoch_num_correct_val / len(rssi_val) * 100))
             if early_stopping.early_stop:
                 model.load_state_dict(torch.load('checkpoint.pt'))
                 break

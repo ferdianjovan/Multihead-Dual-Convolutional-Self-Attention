@@ -38,7 +38,7 @@ class MDCSACRF(nn.Module):
             self.accl_pe = PositionalEncoder(hidden_size)
             self.accl_encoder = nn.Linear(in_features=accl_size, out_features=hidden_size)
         # Multihead Dual Self-Attention Block
-        self.mdsca = MDCSA(hidden_size, 4*hidden_size, [1, 4, 7], dropout)
+        self.mdsca = MDCSA(hidden_size, 4*hidden_size, dropout)
         self.fc_dropout = nn.Dropout(dropout*2)  
         # Sequential classification constraining layer
         self.hidden2loc = nn.Linear(in_features=hidden_size, out_features=loc_size)

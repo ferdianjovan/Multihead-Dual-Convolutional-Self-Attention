@@ -25,19 +25,15 @@ device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
 if __name__ == '__main__':
     
-    rssi_train, accl_train, location_train, _ = load_data(params['data_path'], control=True)
-    rssi_test, accl_test, location_test, _ = load_data(params['data_path'], control=False)
+    rssi_train, accl_train, location_train = load_data(params['data_path'], control=True)
+    rssi_test, accl_test, location_test = load_data(params['data_path'], control=False)
 
     train_idx, validation_idx = np.array([]).astype(np.int64), np.array([]).astype(np.int64)
     for room in ['dining_room', 'living_room', 'kitchen', 'hall', 'stairs', 'porch/outside_front_door']:
         temp = np.unique(np.argwhere(location_train == room)[:, 0])
         if len(temp):
-            # Limit train data to 300 samples per room (= 1 minute worth of samples per room with 5Hz sampling rate)
-            limit = np.min([len(temp), 300])
-            if limit < 300:
-                limit = int(limit / 2)
-            train_idx = np.concatenate([train_idx, temp[:limit]])
-            validation_idx = np.concatenate([validation_idx, temp[limit:]])
+            train_idx = np.concatenate([train_idx, temp[:int(len(temp)/2)]])
+            validation_idx = np.concatenate([validation_idx, temp[int(len(temp)/2):]])
         else:
             print(f'Data for ({room}) is not available!')
 
@@ -69,7 +65,7 @@ if __name__ == '__main__':
         torch.from_numpy(rssi_val).type(torch.float).to(device),
         torch.from_numpy(accl_val).type(torch.float).to(device),
         torch.from_numpy(location_val).type(torch.float).to(device), 
-        params
+        np.argmax(encoder.transform([['hall']])), params
     )
     
     test(

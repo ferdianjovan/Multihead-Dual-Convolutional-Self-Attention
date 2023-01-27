@@ -6,7 +6,7 @@ from einops import rearrange
 from torch.nn import functional as tf
 
 
-class PositionalEncoder(torch.nn.Module):
+class PositionalEncoder(nn.Module):
     """
         Positional Encoder from the original paper "Attention is all you need"
     """
@@ -35,7 +35,7 @@ class PositionalEncoder(torch.nn.Module):
             return x + self.pe[:, :x.size(1)]
 
 
-class CausalConv1d(torch.nn.Conv1d):
+class CausalConv1d(nn.Conv1d):
     def __init__(
         self, in_channels: int, out_channels: int, kernel_size: int, 
         stride: int=1, dilation: int=1, groups: int=1, bias: int=True
@@ -161,7 +161,7 @@ class MDCSA(nn.Module):
     """
         Multihead Dual Convolutional Self-Attention
     """
-    def __init__(self, input_size: int, hidden_size: int, kernel_sizes: list, dropout: float):
+    def __init__(self, input_size: int, hidden_size: int, dropout: float):
         """
         input_size : Embedding Dimensions.
         hidden_size : Size of the hidden dimension in the GRN inside DCSA.
@@ -173,9 +173,9 @@ class MDCSA(nn.Module):
         self_attn = ScaledDotProductAttention(dropout)
         self.sa = deepcopy(self_attn)
         self.norm = nn.LayerNorm(input_size)
-        self.dcsas = [
-            DCSA(input_size, kernel_size, deepcopy(self_attn), hidden_size, dropout) for kernel_size in kernel_sizes
-        ]
+        self.dcsa1 = DCSA(input_size, 1, deepcopy(self_attn), hidden_size, dropout)
+        self.dcsa4 = DCSA(input_size, 4, deepcopy(self_attn), hidden_size, dropout)
+        self.dcsa7 = DCSA(input_size, 7, deepcopy(self_attn), hidden_size, dropout)
         self.conv1d = nn.Conv1d(in_channels=input_size, out_channels=input_size, kernel_size=3, stride=3)
 
     def forward(self, x1, x2, mask):
@@ -183,8 +183,10 @@ class MDCSA(nn.Module):
         x1: [Batch, T, input_size]
         x2: [Batch, T, input_size]
         """
-        x = [self.dcsas[i](x1, x2, mask) for i in range(len(self.dcsas))]
-        x = torch.stack(x, dim=1)
+        _x1 = self.dcsa1(x1, x2, mask)
+        _x4 = self.dcsa4(x1, x2, mask)
+        _x7 = self.dcsa7(x1, x2, mask)
+        x = torch.stack([_x1, _x4, _x7], dim=1)
         x = rearrange(x, 'b (n1 n2) (l1 l2) d -> b (n1 l1) (n2 l2) d', n1=1, l1=x1.shape[1])
         x = rearrange(x, 'b l n d -> b (l n) d')
         x = self.sa(x, x, x, None)[0]
