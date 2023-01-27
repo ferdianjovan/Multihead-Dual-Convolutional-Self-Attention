@@ -2,7 +2,6 @@ import os
 import torch
 import pickle
 import numpy as np
-import pandas as pd
 from torch import optim
 from sklearn.preprocessing import MinMaxScaler
 
@@ -19,7 +18,7 @@ def load_pkl(file: str):
         return pickle.load(f)
 
     
-def load_data(data_path: str, control: bool=True, daily_limit: list=[(8, 0), (20, 0)]):
+def load_data(data_path: str, control: bool=True):
     """
     data_path: Path to data
     control: Load HC or PD
@@ -32,11 +31,7 @@ def load_data(data_path: str, control: bool=True, daily_limit: list=[(8, 0), (20
     rssi = load_pkl(os.path.join(file_path, 'rssi.pkl'))
     accl = load_pkl(os.path.join(file_path, 'accl.pkl'))
     location = load_pkl(os.path.join(file_path, 'location.pkl'))
-    ts = load_pkl(os.path.join(file_path, 'timestamp.pkl'))
-    min_start = pd.Timestamp(str(ts[0].date()) + f' 0{daily_limit[0][0]}:0{daily_limit[0][1]}:00')
-    max_end = pd.Timestamp(str(ts[0].date()) + f' 0{daily_limit[1][0]}:0{daily_limit[1][1]}:00')
-    idx = np.argwhere((min_start <= ts[:]) & (ts[:] < max_end)).reshape(-1)
-    return rssi[idx], accl[idx], location[idx]
+    return rssi, accl, location
 
 
 def normalise(train: np.array, test: np.array=None, val: np.array=None):
