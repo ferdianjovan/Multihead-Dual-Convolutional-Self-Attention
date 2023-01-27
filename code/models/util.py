@@ -76,7 +76,7 @@ def train_validate(
             rssi_size=rssi.shape[-1], accl_size=accl.shape[-1], hidden_size=params['hidden_size'],
             T=rssi.shape[1], loc_size=locations.shape[-1]
         )
-    model = model.to(rssi.device)
+    model.to(rssi.device)
     # Optimizer with Lookahead
     base_optimizer = optim.RAdam(model.parameters(), lr=params['learning_rate'])
     optimizer = Lookahead(base_optimizer, k=5, alpha=.5)
@@ -110,7 +110,7 @@ def train_validate(
             epoch_num_correct += (loc_hat[:, -1] == y[:, -1].argmax(-1)).type(torch.float).sum().item()
             if batch_idx % 5 == 0:
                 print('Batch: {}, Train Loss: {:.5f}, Acc: {:.5f}'.format(
-                    batch_idx * params['batch_size'], total_loss / (batch_idx + 1), 
+                    batch_idx + 1, total_loss / (batch_idx + 1), 
                     epoch_num_correct / len(rssi) * 100
                 ))
 
@@ -146,22 +146,10 @@ def test(model: torch.nn, rssi: torch.Tensor, accl: torch.Tensor, locations: tor
     locations: Room-level labels [Batch, T, Loc_Size]
     params: Hyperparameters {'hidden_size', 'learning_rate', 'epoch', 'batch_size'}
     """
-    if accl is None:
-        model = MDCSACRF(
-            rssi_size=rssi.shape[-1], hidden_size=params['hidden_size'], 
-            T=rssi.shape[1], loc_size=locations.shape[-1]
-        )
-    else:
-        model = MDCSACRF(
-            rssi_size=rssi.shape[-1], accl_size=accl.shape[-1], hidden_size=params['hidden_size'],
-            T=rssi.shape[1], loc_size=locations.shape[-1]
-        )
-    model = model.to(rssi.device)
-    model.eval()
-    
     correct = 0
-    num_batches = np.ceil(rssi.shape[0] / params['batch_size'])
+    model.eval()
     with torch.no_grad():
+        num_batches = np.ceil(rssi.shape[0] / params['batch_size'])
         for batch_idx in range(int(num_batches)):
             X0 = rssi[(batch_idx * params['batch_size']):((batch_idx + 1) * params['batch_size'])]
             y = locations[(batch_idx * params['batch_size']):((batch_idx + 1) * params['batch_size'])]
@@ -172,4 +160,3 @@ def test(model: torch.nn, rssi: torch.Tensor, accl: torch.Tensor, locations: tor
             correct += (loc_hat[:, -1] == y[:, -1].argmax(-1)).type(torch.float).sum().item()
     correct /= rssi.shape[0]
     print(f"Test error: \n Accuracy: {(100*correct):>0.1f}%")
-    return (100*correct)
