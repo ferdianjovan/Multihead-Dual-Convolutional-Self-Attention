@@ -1,7 +1,7 @@
 # NN libraries
 import torch
 from torch import nn
-from torchcrf import CRF
+from TorchCRF import CRF
 
 # Local library
 from submodules import PositionalEncoder, MDCSA

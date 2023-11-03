@@ -5,6 +5,7 @@
 This is a Pytorch implementation of MDCSA network which is introduced in our paper. The network was designed and tested to perform indoor room-level localisation on people with Parkinson's diseases. To run the network, a script ```run``` in ```code``` folder can be run as ```bash run```. Alternatively, a Jupyter notebook named ```mdcsa_sample_test.ipynb``` can be run through Jupyter notebook or Jupyter Lab.
 
 Pytorch version: 1.10.0 (may be compatible with higher/lower versions)
+TorchCRF version: 1.1.0 (not compatible with lower versions)
 
 Jupyterlab version: 3.2.1 (may be compatible with higher/lower versions)
 
